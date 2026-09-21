@@ -1,0 +1,24 @@
+env: dev
+
+app_project: gosoline
+app_family: authz
+app_group: examples
+app_name: authorization-decorator
+
+httpserver:
+  default:
+    port: 8080
+    mode: release
+
+sqlc:
+  default:
+    driver: mysql
+    uri:
+      host: localhost
+      port: 33067
+      user: root
+      password: gosoline
+      database: authz_example
+    migrations:
+      enabled: true
+      path: migrations
