@@ -198,6 +198,31 @@ func ResourcePolicy[I ResourceIdentity, O any](permission string) Policy[I, O] {
 	}
 }
 
+// ListPolicy creates a policy that checks a caller-resolved collection parent
+// before the operation. It does not check or filter individual results.
+func ListPolicy[I, O any](permission string, resource func(context.Context, *I) (Resource, error)) Policy[I, O] {
+	return Policy[I, O]{
+		Before: func(ctx context.Context, input *I) ([]Check, error) {
+			if input == nil {
+				return nil, errors.New("authorization list policy input is nil")
+			}
+			if resource == nil {
+				return nil, errors.New("authorization list policy resource resolver is nil")
+			}
+
+			resolved, err := resource(ctx, input)
+			if err != nil {
+				return nil, err
+			}
+
+			return []Check{{
+				Resource:   resolved,
+				Permission: permission,
+			}}, nil
+		},
+	}
+}
+
 // BulkResourcePolicy creates a policy for an operation with a general resource
 // check before execution and individual resource checks after execution. It is
 // suitable for list, search, batch, or any other operation returning a resource
