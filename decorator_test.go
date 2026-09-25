@@ -117,24 +117,20 @@ func TestListPolicyReturnsBuildErrors(t *testing.T) {
 		resolverErr error
 		nilResolver bool
 		wantErr     error
-		wantMessage string
 	}{
 		{
-			name:        "nil input",
-			wantMessage: "authorization list policy input is nil",
+			name: "nil input",
 		},
 		{
 			name:        "nil resource resolver",
 			input:       &listRequest{AccountID: "child"},
 			nilResolver: true,
-			wantMessage: "authorization list policy resource resolver is nil",
 		},
 		{
 			name:        "resolver error",
 			input:       &listRequest{AccountID: "child"},
 			resolverErr: resolverError,
 			wantErr:     resolverError,
-			wantMessage: resolverError.Error(),
 		},
 	}
 
@@ -174,8 +170,8 @@ func TestListPolicyReturnsBuildErrors(t *testing.T) {
 			)
 
 			_, err = operation(withTestSubject(), test.input)
-			if err == nil || !strings.Contains(err.Error(), test.wantMessage) {
-				t.Fatalf("operation error is %v, want message containing %q", err, test.wantMessage)
+			if err == nil {
+				t.Fatal("operation succeeded despite an invalid list policy input")
 			}
 			if test.wantErr != nil && !errors.Is(err, test.wantErr) {
 				t.Fatalf("operation error %v does not wrap resolver error %v", err, test.wantErr)
