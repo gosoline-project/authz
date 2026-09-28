@@ -65,8 +65,8 @@ type Decision struct {
 }
 
 // Evaluator is the framework-neutral seam for the authorization-service client.
-// The decorator always uses the bulk operation, including for one check, so a
-// list policy can evaluate all returned items at one consistency point.
+// The decorator always uses the bulk operation, including for one check, so
+// collection policies can evaluate all returned items at one consistency point.
 type Evaluator interface {
 	CheckBulk(context.Context, Subject, []Check) ([]Decision, error)
 }
