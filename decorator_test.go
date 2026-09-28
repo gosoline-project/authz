@@ -50,11 +50,21 @@ type listRequest struct {
 	AccountID string
 }
 
+func (input listRequest) AuthorizationResource() authz.Resource {
+	return authz.Resource{Type: "account", ID: input.AccountID}
+}
+
+type testIDInput struct {
+	ID string
+}
+
+func (input testIDInput) GetId() string {
+	return input.ID
+}
+
 func TestListPolicyChecksParentBeforeNext(t *testing.T) {
 	t.Parallel()
 
-	type contextKey struct{}
-	ctx := context.WithValue(withTestSubject(), contextKey{}, "list scope")
 	expectedResource := authz.Resource{Type: "account", ID: "parent"}
 	var events []string
 	authorizer, err := authz.NewAuthorization(
@@ -77,24 +87,14 @@ func TestListPolicyChecksParentBeforeNext(t *testing.T) {
 
 	operation := authz.Decorate(
 		authorizer,
-		authz.ListPolicy[listRequest, []string]("list", func(ctx context.Context, input *listRequest) (authz.Resource, error) {
-			events = append(events, "resolve")
-			if input.AccountID != "child" {
-				t.Fatalf("resolver received account ID %q, want child", input.AccountID)
-			}
-			if ctx.Value(contextKey{}) != "list scope" {
-				t.Fatal("resolver did not receive the caller context")
-			}
-
-			return expectedResource, nil
-		}),
+		authz.ListPolicy[listRequest, []string]("list"),
 		func(context.Context, *listRequest) ([]string, error) {
 			events = append(events, "next")
 			return []string{"item"}, nil
 		},
 	)
 
-	_, err = operation(ctx, &listRequest{AccountID: "child"})
+	_, err = operation(withTestSubject(), &listRequest{AccountID: "parent"})
 	var deniedError *authz.DeniedError
 	if !errors.As(err, &deniedError) {
 		t.Fatalf("operation error %v is not a DeniedError", err)
@@ -102,87 +102,42 @@ func TestListPolicyChecksParentBeforeNext(t *testing.T) {
 	if deniedError.Phase != "before" || deniedError.Check.Resource != expectedResource || deniedError.Check.Permission != "list" {
 		t.Fatalf("DeniedError is %+v", deniedError)
 	}
-	if !reflect.DeepEqual(events, []string{"resolve", "check"}) {
-		t.Fatalf("execution order is %v, want resolver and check before next", events)
+	if !reflect.DeepEqual(events, []string{"check"}) {
+		t.Fatalf("execution order is %v, want parent check before next", events)
 	}
 }
 
-func TestListPolicyReturnsBuildErrors(t *testing.T) {
+func TestListPolicyRejectsNilInput(t *testing.T) {
 	t.Parallel()
 
-	resolverError := errors.New("parent lookup failed")
-	tests := []struct {
-		name        string
-		input       *listRequest
-		resolverErr error
-		nilResolver bool
-		wantErr     error
-	}{
-		{
-			name: "nil input",
-		},
-		{
-			name:        "nil resource resolver",
-			input:       &listRequest{AccountID: "child"},
-			nilResolver: true,
-		},
-		{
-			name:        "resolver error",
-			input:       &listRequest{AccountID: "child"},
-			resolverErr: resolverError,
-			wantErr:     resolverError,
-		},
+	evaluatorCalled := false
+	authorizer, err := authz.NewAuthorization(
+		evaluatorFunc(func(_ context.Context, _ authz.Subject, _ []authz.Check) ([]authz.Decision, error) {
+			evaluatorCalled = true
+			return []authz.Decision{{Allowed: true}}, nil
+		}),
+		authz.WithMode(authz.Enforce),
+	)
+	if err != nil {
+		t.Fatalf("NewAuthorization returned an error: %v", err)
 	}
 
-	for _, test := range tests {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
+	nextCalled := false
+	operation := authz.Decorate(
+		authorizer,
+		authz.ListPolicy[listRequest, []string]("list"),
+		func(context.Context, *listRequest) ([]string, error) {
+			nextCalled = true
+			return nil, nil
+		},
+	)
 
-			resolverCalled := false
-			resolver := func(context.Context, *listRequest) (authz.Resource, error) {
-				resolverCalled = true
-				return authz.Resource{Type: "account", ID: "parent"}, test.resolverErr
-			}
-			if test.nilResolver {
-				resolver = nil
-			}
-
-			evaluatorCalled := false
-			authorizer, err := authz.NewAuthorization(
-				evaluatorFunc(func(_ context.Context, _ authz.Subject, _ []authz.Check) ([]authz.Decision, error) {
-					evaluatorCalled = true
-					return []authz.Decision{{Allowed: true}}, nil
-				}),
-				authz.WithMode(authz.Enforce),
-			)
-			if err != nil {
-				t.Fatalf("NewAuthorization returned an error: %v", err)
-			}
-			nextCalled := false
-			operation := authz.Decorate(
-				authorizer,
-				authz.ListPolicy[listRequest, []string]("list", resolver),
-				func(context.Context, *listRequest) ([]string, error) {
-					nextCalled = true
-					return nil, nil
-				},
-			)
-
-			_, err = operation(withTestSubject(), test.input)
-			if err == nil {
-				t.Fatal("operation succeeded despite an invalid list policy input")
-			}
-			if test.wantErr != nil && !errors.Is(err, test.wantErr) {
-				t.Fatalf("operation error %v does not wrap resolver error %v", err, test.wantErr)
-			}
-			if resolverCalled != (test.input != nil && !test.nilResolver) {
-				t.Fatalf("resolver called = %v for input %v and nil resolver %v", resolverCalled, test.input, test.nilResolver)
-			}
-			if evaluatorCalled || nextCalled {
-				t.Fatalf("operation continued after policy build error: evaluator=%v, next=%v", evaluatorCalled, nextCalled)
-			}
-		})
+	_, err = operation(withTestSubject(), nil)
+	if err == nil || !strings.Contains(err.Error(), "authorization resource policy input is nil") {
+		t.Fatalf("operation error %v does not report nil list input", err)
+	}
+	if evaluatorCalled || nextCalled {
+		t.Fatalf("operation continued after nil input: evaluator=%v, next=%v", evaluatorCalled, nextCalled)
 	}
 }
 
@@ -209,15 +164,13 @@ func TestListPolicyFilterModeDoesNotFilterItems(t *testing.T) {
 	expectedOutput := []string{"visible item", "item without a separate check"}
 	operation := authz.Decorate(
 		authorizer,
-		authz.ListPolicy[listRequest, []string]("list", func(context.Context, *listRequest) (authz.Resource, error) {
-			return expectedResource, nil
-		}),
+		authz.ListPolicy[listRequest, []string]("list"),
 		func(context.Context, *listRequest) ([]string, error) {
 			return append([]string(nil), expectedOutput...), nil
 		},
 	)
 
-	output, err := operation(withTestSubject(), &listRequest{AccountID: "child"})
+	output, err := operation(withTestSubject(), &listRequest{AccountID: "parent"})
 	if err != nil {
 		t.Fatalf("filter mode list operation returned an error: %v", err)
 	}
@@ -226,6 +179,85 @@ func TestListPolicyFilterModeDoesNotFilterItems(t *testing.T) {
 	}
 	if evaluatorCalls != 1 {
 		t.Fatalf("evaluator received %d calls, want one parent check and no item checks", evaluatorCalls)
+	}
+}
+
+func TestIDPolicyChecksPointIDBeforeNext(t *testing.T) {
+	t.Parallel()
+
+	expectedCheck := authz.Check{
+		Resource:   authz.Resource{Type: "experiment", ID: "experiment-123"},
+		Permission: "write",
+	}
+	evaluatorCalls := 0
+	authorizer, err := authz.NewAuthorization(
+		evaluatorFunc(func(_ context.Context, _ authz.Subject, checks []authz.Check) ([]authz.Decision, error) {
+			evaluatorCalls++
+			if len(checks) != 1 || checks[0] != expectedCheck {
+				t.Fatalf("evaluator received checks %+v, want one point-ID check %+v", checks, expectedCheck)
+			}
+
+			return []authz.Decision{{Allowed: true}}, nil
+		}),
+		authz.WithMode(authz.Enforce),
+	)
+	if err != nil {
+		t.Fatalf("NewAuthorization returned an error: %v", err)
+	}
+
+	nextCalled := false
+	operation := authz.Decorate(
+		authorizer,
+		authz.IDPolicy[testIDInput, []string]("experiment", "write"),
+		func(context.Context, *testIDInput) ([]string, error) {
+			nextCalled = true
+			return []string{"updated"}, nil
+		},
+	)
+
+	output, err := operation(withTestSubject(), &testIDInput{ID: "experiment-123"})
+	if err != nil {
+		t.Fatalf("point ID operation returned an error: %v", err)
+	}
+	if !nextCalled || evaluatorCalls != 1 {
+		t.Fatalf("operation calls: evaluator=%d, next=%v; want one check then next", evaluatorCalls, nextCalled)
+	}
+	if !reflect.DeepEqual(output, []string{"updated"}) {
+		t.Fatalf("operation returned %v, want updated result", output)
+	}
+}
+
+func TestIDPolicyRejectsNilInput(t *testing.T) {
+	t.Parallel()
+
+	evaluatorCalled := false
+	authorizer, err := authz.NewAuthorization(
+		evaluatorFunc(func(_ context.Context, _ authz.Subject, _ []authz.Check) ([]authz.Decision, error) {
+			evaluatorCalled = true
+			return []authz.Decision{{Allowed: true}}, nil
+		}),
+		authz.WithMode(authz.Enforce),
+	)
+	if err != nil {
+		t.Fatalf("NewAuthorization returned an error: %v", err)
+	}
+
+	nextCalled := false
+	operation := authz.Decorate(
+		authorizer,
+		authz.IDPolicy[testIDInput, []string]("experiment", "write"),
+		func(context.Context, *testIDInput) ([]string, error) {
+			nextCalled = true
+			return nil, nil
+		},
+	)
+
+	_, err = operation(withTestSubject(), nil)
+	if err == nil || !strings.Contains(err.Error(), "authorization ID policy input is nil") {
+		t.Fatalf("operation error %v does not report nil ID input", err)
+	}
+	if evaluatorCalled || nextCalled {
+		t.Fatalf("operation continued after nil input: evaluator=%v, next=%v", evaluatorCalled, nextCalled)
 	}
 }
 

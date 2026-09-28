@@ -198,29 +198,28 @@ func ResourcePolicy[I ResourceIdentity, O any](permission string) Policy[I, O] {
 	}
 }
 
-// ListPolicy creates a policy that checks a caller-resolved collection parent
-// before the operation. It does not check or filter individual results.
-func ListPolicy[I, O any](permission string, resource func(context.Context, *I) (Resource, error)) Policy[I, O] {
+// IDPolicy creates a policy for a SQLH-style input with a GetId method. The
+// check runs before the operation so Enforce mode can prevent the operation
+// from running when the subject lacks the supplied permission.
+func IDPolicy[I interface{ GetId() string }, O any](resourceType string, permission string) Policy[I, O] {
 	return Policy[I, O]{
-		Before: func(ctx context.Context, input *I) ([]Check, error) {
+		Before: func(_ context.Context, input *I) ([]Check, error) {
 			if input == nil {
-				return nil, errors.New("authorization list policy input is nil")
-			}
-			if resource == nil {
-				return nil, errors.New("authorization list policy resource resolver is nil")
-			}
-
-			resolved, err := resource(ctx, input)
-			if err != nil {
-				return nil, err
+				return nil, errors.New("authorization ID policy input is nil")
 			}
 
 			return []Check{{
-				Resource:   resolved,
+				Resource:   Resource{Type: resourceType, ID: (*input).GetId()},
 				Permission: permission,
 			}}, nil
 		},
 	}
+}
+
+// ListPolicy checks the parent resource represented by an input before the
+// operation. It does not check or filter individual results.
+func ListPolicy[I ResourceIdentity, O any](permission string) Policy[I, O] {
+	return ResourcePolicy[I, O](permission)
 }
 
 // BulkResourcePolicy creates a policy for an operation with a general resource
