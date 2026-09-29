@@ -1,4 +1,4 @@
-// Package authzhttp provides HTTP integration for authz errors.
+// Package authzhttp provides HTTP integration for authz errors and consistency token propagation.
 package authzhttp
 
 import (
