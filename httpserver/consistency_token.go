@@ -3,6 +3,7 @@ package authzhttp
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"net"
 	"net/http"
@@ -63,26 +64,13 @@ func ConsistencyMiddleware(next http.Handler, options ...ConsistencyOption) http
 		ctx := authz.WithConsistencyToken(request.Context(), initialToken)
 		request = request.WithContext(ctx)
 
-		base := newConsistencyTokenResponseWriter(writer, func() {
-			latestToken := authz.ConsistencyToken(ctx)
-			if latestToken == "" {
-				return
-			}
-
-			wireToken := ""
-			if latestToken == initialToken && initialToken != "" {
-				wireToken = incomingWireToken
-			} else {
-				wireToken = codec.encode(latestToken)
-			}
-			if wireToken == "" {
-				return
-			}
-
-			header := writer.Header()
-			header.Set(consistencyTokenHeader, wireToken)
-			exposeConsistencyTokenHeader(header)
-		})
+		base := &consistencyTokenResponseWriter{
+			ResponseWriter:    writer,
+			context:           ctx,
+			initialToken:      initialToken,
+			incomingWireToken: incomingWireToken,
+			codec:             &codec,
+		}
 		responseWriter := wrapConsistencyTokenResponseWriter(base)
 
 		next.ServeHTTP(responseWriter, request)
@@ -109,9 +97,12 @@ func exposeConsistencyTokenHeader(header http.Header) {
 
 type consistencyTokenResponseWriter struct {
 	http.ResponseWriter
-	injectHeaders   func()
-	committed       bool
-	headersInjected bool
+	context           context.Context
+	initialToken      string
+	incomingWireToken string
+	codec             *consistencyTokenCodec
+	committed         bool
+	headersInjected   bool
 }
 
 func (writer *consistencyTokenResponseWriter) Unwrap() http.ResponseWriter {
@@ -185,7 +176,22 @@ func (writer *consistencyTokenResponseWriter) inject() {
 	}
 
 	writer.headersInjected = true
-	writer.injectHeaders()
+	latestToken := authz.ConsistencyToken(writer.context)
+	if latestToken == "" {
+		return
+	}
+
+	wireToken := writer.incomingWireToken
+	if latestToken != writer.initialToken {
+		wireToken = writer.codec.encode(latestToken)
+	}
+	if wireToken == "" {
+		return
+	}
+
+	header := writer.Header()
+	header.Set(consistencyTokenHeader, wireToken)
+	exposeConsistencyTokenHeader(header)
 }
 
 type consistencyTokenCloseNotifyResponseWriter struct {
@@ -195,13 +201,6 @@ type consistencyTokenCloseNotifyResponseWriter struct {
 
 func (writer *consistencyTokenCloseNotifyResponseWriter) CloseNotify() <-chan bool {
 	return writer.closeNotifier.CloseNotify()
-}
-
-func newConsistencyTokenResponseWriter(underlying http.ResponseWriter, injectHeaders func()) *consistencyTokenResponseWriter {
-	return &consistencyTokenResponseWriter{
-		ResponseWriter: underlying,
-		injectHeaders:  injectHeaders,
-	}
 }
 
 func wrapConsistencyTokenResponseWriter(writer *consistencyTokenResponseWriter) http.ResponseWriter {
