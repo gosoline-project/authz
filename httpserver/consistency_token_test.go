@@ -241,6 +241,38 @@ func TestConsistencyMiddlewarePublishesOnHandlerReturnWithoutCommittingEarly(t *
 	}
 }
 
+func TestConsistencyMiddlewareLeavesHandlerReturnUncommittedForOuterMiddleware(t *testing.T) {
+	t.Parallel()
+
+	handler := http.HandlerFunc(func(_ http.ResponseWriter, request *http.Request) {
+		authz.SetConsistencyToken(request.Context(), "published")
+	})
+	consistencyMiddleware := authzhttp.ConsistencyMiddleware(handler, consistencyTokenCodec())
+	outerMiddleware := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		consistencyMiddleware.ServeHTTP(writer, request)
+		http.Error(writer, "outer error", http.StatusInternalServerError)
+	})
+
+	recorder := httptest.NewRecorder()
+	outerMiddleware.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	response := recorder.Result()
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusInternalServerError)
+	}
+	if got := response.Header.Get("X-Consistency-Token"); got != "encoded:published" {
+		t.Fatalf("response token = %q, want encoded:published", got)
+	}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("reading response body: %v", err)
+	}
+	if string(body) != "outer error\n" {
+		t.Fatalf("response body = %q, want outer error", body)
+	}
+}
+
 func TestConsistencyMiddlewareDoesNotRewriteTokenAfterCommit(t *testing.T) {
 	t.Parallel()
 

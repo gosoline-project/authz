@@ -44,6 +44,8 @@ func WithConsistencyTokenCodec(decode func(string) string, encode func(string) s
 // and publishes a changed token before the response is committed.
 // By default, X-Consistency-Token values pass through without encoding or expiry.
 // Unchanged tokens retain their original wire value. A codec handles backend-specific formats.
+// If the handler returns without committing a response, the middleware populates
+// headers without writing a status, so outer middleware can still render an error.
 func ConsistencyMiddleware(next http.Handler, options ...ConsistencyOption) http.Handler {
 	codec := consistencyTokenCodec{
 		decode: func(token string) string { return token },
