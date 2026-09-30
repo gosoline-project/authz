@@ -17,9 +17,6 @@ func TestConsistencyTokenContextState(t *testing.T) {
 	if got := authz.ConsistencyToken(ctx); got != "incoming" {
 		t.Fatalf("ConsistencyToken returned %q, want incoming", got)
 	}
-	if got := authz.NewConsistencyToken(ctx); got != "" {
-		t.Fatalf("NewConsistencyToken returned %q before a token was published", got)
-	}
 
 	subjectCtx := authz.WithSubject(ctx, authz.Subject{Type: "user", ID: "42"})
 	if got := authz.ConsistencyToken(subjectCtx); got != "incoming" {
@@ -30,9 +27,6 @@ func TestConsistencyTokenContextState(t *testing.T) {
 	if got := authz.ConsistencyToken(ctx); got != "published" {
 		t.Fatalf("ConsistencyToken on the parent returned %q, want published", got)
 	}
-	if got := authz.NewConsistencyToken(ctx); got != "published" {
-		t.Fatalf("NewConsistencyToken returned %q, want published", got)
-	}
 
 	authz.SetConsistencyToken(subjectCtx, "")
 	if got := authz.ConsistencyToken(ctx); got != "published" {
@@ -42,9 +36,6 @@ func TestConsistencyTokenContextState(t *testing.T) {
 	freshCtx := authz.WithConsistencyToken(subjectCtx, "")
 	if got := authz.ConsistencyToken(freshCtx); got != "" {
 		t.Fatalf("fresh empty-token state inherited %q", got)
-	}
-	if got := authz.NewConsistencyToken(freshCtx); got != "" {
-		t.Fatalf("fresh empty-token state returned published token %q", got)
 	}
 
 	authz.SetConsistencyToken(freshCtx, "fresh")
@@ -127,7 +118,6 @@ func TestConsistencyTokenConcurrentReadsAndWrites(t *testing.T) {
 			for iteration := range iterations {
 				authz.SetConsistencyToken(ctx, fmt.Sprintf("token-%d-%d", worker, iteration))
 				_ = authz.ConsistencyToken(ctx)
-				_ = authz.NewConsistencyToken(ctx)
 			}
 		}(worker)
 	}
@@ -136,7 +126,6 @@ func TestConsistencyTokenConcurrentReadsAndWrites(t *testing.T) {
 			defer group.Done()
 			for range iterations {
 				_ = authz.ConsistencyToken(ctx)
-				_ = authz.NewConsistencyToken(ctx)
 			}
 		}()
 	}
@@ -147,8 +136,5 @@ func TestConsistencyTokenConcurrentReadsAndWrites(t *testing.T) {
 	authz.SetConsistencyToken(ctx, "final")
 	if got := authz.ConsistencyToken(ctx); got != "final" {
 		t.Fatalf("ConsistencyToken after concurrent writes returned %q, want final", got)
-	}
-	if got := authz.NewConsistencyToken(ctx); got != "final" {
-		t.Fatalf("NewConsistencyToken after concurrent writes returned %q, want final", got)
 	}
 }
