@@ -65,8 +65,8 @@ type Decision struct {
 }
 
 // Evaluator is the framework-neutral seam for the authorization-service client.
-// The decorator always uses the bulk operation, including for one check, so a
-// list policy can evaluate all returned items at one consistency point.
+// The decorator always uses the bulk operation, including for one check, so
+// collection policies can evaluate all returned items at one consistency point.
 type Evaluator interface {
 	CheckBulk(context.Context, Subject, []Check) ([]Decision, error)
 }
@@ -198,6 +198,30 @@ func ResourcePolicy[I ResourceIdentity, O any](permission string) Policy[I, O] {
 	}
 }
 
+// IDPolicy creates a policy for a SQLH-style input with a GetId method. The
+// check runs before the operation so Enforce mode can prevent the operation
+// from running when the subject lacks the supplied permission.
+func IDPolicy[I interface{ GetId() string }, O any](resourceType string, permission string) Policy[I, O] {
+	return Policy[I, O]{
+		Before: func(_ context.Context, input *I) ([]Check, error) {
+			if input == nil {
+				return nil, errors.New("authorization ID policy input is nil")
+			}
+
+			return []Check{{
+				Resource:   Resource{Type: resourceType, ID: (*input).GetId()},
+				Permission: permission,
+			}}, nil
+		},
+	}
+}
+
+// ListPolicy checks the parent resource represented by an input before the
+// operation. It does not check or filter individual results.
+func ListPolicy[I ResourceIdentity, O any](permission string) Policy[I, O] {
+	return ResourcePolicy[I, O](permission)
+}
+
 // BulkResourcePolicy creates a policy for an operation with a general resource
 // check before execution and individual resource checks after execution. It is
 // suitable for list, search, batch, or any other operation returning a resource
@@ -260,7 +284,7 @@ func filterResourceCollection[O ResourceCollection](output *O, decisions []Decis
 
 func filterResourceCollectionOutput(output any, allowed []bool) error {
 	value := reflect.ValueOf(output)
-	for value.IsValid() && value.Kind() == reflect.Ptr {
+	for value.IsValid() && value.Kind() == reflect.Pointer {
 		if value.IsNil() {
 			return errors.New("authorization collection output is nil")
 		}
@@ -300,6 +324,23 @@ func filterResourceCollectionOutput(output any, allowed []bool) error {
 // HTTP response presentation.
 type Operation[I, O any] func(context.Context, *I) (O, error)
 
+// OperationOption configures one typed decorated operation. It is applied once
+// when Decorate constructs the operation.
+type OperationOption[I, O any] func(*operationOptions[I, O])
+
+type operationOptions[I, O any] struct {
+	onSuccess []func(context.Context, *I, O)
+}
+
+// OnSuccess registers a callback that runs after the operation succeeds and
+// before its after-policy checks or result filtering. The callback receives
+// the operation input and original output and should treat both as read-only.
+func OnSuccess[I, O any](callback func(context.Context, *I, O)) OperationOption[I, O] {
+	return func(options *operationOptions[I, O]) {
+		options.onSuccess = append(options.onSuccess, callback)
+	}
+}
+
 type decorator[I, O any] struct {
 	evaluator Evaluator
 	policy    Policy[I, O]
@@ -307,6 +348,7 @@ type decorator[I, O any] struct {
 	subject   SubjectResolver
 	mode      Mode
 	observer  Observer
+	onSuccess []func(context.Context, *I, O)
 }
 
 // Authorization stores an evaluator and resolved options shared by any
@@ -339,15 +381,29 @@ func NewAuthorization(evaluator Evaluator, options ...Option) (*Authorization, e
 
 // Decorate applies a configured authorizer to a typed policy and operation.
 // The generic input/output types are inferred independently for every call,
-// so one Authorization can be reused for multiple operation shapes. Invalid
-// decorator configuration is a programming error and causes a panic during
-// route construction, which keeps the successful path convenient to compose.
-func Decorate[I, O any](authorizer *Authorization, policy Policy[I, O], next Operation[I, O]) Operation[I, O] {
+// so one Authorization can be reused for multiple operation shapes. Operation
+// options apply only to the decorated operation. Invalid decorator
+// configuration is a programming error and causes a panic during route
+// construction, which keeps the successful path convenient to compose.
+func Decorate[I, O any](authorizer *Authorization, policy Policy[I, O], next Operation[I, O], options ...OperationOption[I, O]) Operation[I, O] {
 	if authorizer == nil {
 		panic("authorization authorizer is required")
 	}
 	if next == nil {
 		panic("next operation is required")
+	}
+
+	resolvedOptions := operationOptions[I, O]{}
+	for _, option := range options {
+		if option == nil {
+			panic("authorization operation option is nil")
+		}
+		option(&resolvedOptions)
+	}
+	for _, callback := range resolvedOptions.onSuccess {
+		if callback == nil {
+			panic("authorization success callback is required")
+		}
 	}
 
 	wrapped := &decorator[I, O]{
@@ -357,6 +413,7 @@ func Decorate[I, O any](authorizer *Authorization, policy Policy[I, O], next Ope
 		subject:   authorizer.options.subject,
 		mode:      authorizer.options.mode,
 		observer:  authorizer.options.observer,
+		onSuccess: resolvedOptions.onSuccess,
 	}
 
 	return wrapped.Handle
@@ -388,6 +445,10 @@ func (d *decorator[I, O]) Handle(ctx context.Context, input *I) (output O, err e
 	output, err = d.next(ctx, input)
 	if err != nil {
 		return output, err
+	}
+
+	for _, callback := range d.onSuccess {
+		callback(ctx, input, output)
 	}
 
 	if checks, policyErr := d.after(ctx, input, &output); policyErr != nil {
