@@ -1,3 +1,3 @@
 module github.com/gosoline-project/authz
 
-go 1.25.7
+go 1.26.10
