@@ -5,10 +5,10 @@ go 1.27.0
 require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/gosoline-project/authz v0.0.0
-	github.com/gosoline-project/httpserver v0.6.5-0.20261022101036-a7690f24137e
+	github.com/gosoline-project/httpserver v0.6.5-0.20261026100922-13fdf9916b14
 	github.com/gosoline-project/sqlh v0.8.2-0.20261022102734-962184e2f219
 	github.com/gosoline-project/sqlr v0.9.2-0.20261022101442-f23fc53d1d89
-	github.com/justtrackio/gosoline v0.68.4-0.20261022095443-a18815d97543
+	github.com/justtrackio/gosoline v0.68.4-0.20261026102448-e669b1bf2ab6
 )
 
 require (
