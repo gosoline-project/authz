@@ -5,10 +5,10 @@ go 1.27.0
 require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/gosoline-project/authz v0.0.0
-	github.com/gosoline-project/httpserver v0.6.5-0.20261026100922-13fdf9916b14
+	github.com/gosoline-project/httpserver v0.6.5-0.20261110113715-f6493110894a
 	github.com/gosoline-project/sqlh v0.8.2-0.20261022102734-962184e2f219
 	github.com/gosoline-project/sqlr v0.9.2-0.20261022101442-f23fc53d1d89
-	github.com/justtrackio/gosoline v0.69.0
+	github.com/justtrackio/gosoline v0.68.4-0.20261105105331-d2be354ca7bc
 )
 
 require (
@@ -86,7 +86,7 @@ require (
 	github.com/go-playground/validator/v10 v10.27.0 // indirect
 	github.com/go-resty/resty/v2 v2.7.1-0.20230308051516-1578007c3c8d // indirect
 	github.com/go-sql-driver/mysql v1.9.3 // indirect
-	github.com/go-viper/mapstructure/v2 v2.3.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -95,7 +95,7 @@ require (
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gosoline-project/sqlc v0.4.2-0.20261022101232-4e97a8c5efc7 // indirect
+	github.com/gosoline-project/sqlc v0.4.2-0.20261110112606-0b6d278a8c75 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/hamba/avro/v2 v2.29.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
