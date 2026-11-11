@@ -266,6 +266,8 @@ github.com/gosoline-project/httpserver v0.6.5 h1:fKZR0LAynyHrXHhxVbJF+kPcRirpixb
 github.com/gosoline-project/httpserver v0.6.5/go.mod h1:21KcaSy8E5PpinaW8lvwRjyGcdYwoI06rYqyBZjqXGM=
 github.com/gosoline-project/sqlc v0.4.2-0.20261022101232-4e97a8c5efc7 h1:SQcMpsASrvsQVVfSq+rAK6JoRPrB+lTBYCVLyF2B/ZA=
 github.com/gosoline-project/sqlc v0.4.2-0.20261022101232-4e97a8c5efc7/go.mod h1:PDCtW3AFtg9GPFnGRzLoIS4HZZMrxCNrrSEPalO4QAs=
+github.com/gosoline-project/sqlc v0.5.0 h1:BwgTjt3G4INRJc30KKXqEffCwxarghooAluLuS8eJj4=
+github.com/gosoline-project/sqlc v0.5.0/go.mod h1:4qyPS03Tt54GjDhKu7r6itVMZ1+5v30nUf9bAIIURkM=
 github.com/gosoline-project/sqlh v0.8.2-0.20261022102734-962184e2f219 h1:kRfMvzTY9jmwLJ2ZW8jbGy1E3GnfXZAAaNfAQprOemk=
 github.com/gosoline-project/sqlh v0.8.2-0.20261022102734-962184e2f219/go.mod h1:7NKhIbs9B5DHYJKKlwCyDV4liCCmOzYyHuenfJdq9s8=
 github.com/gosoline-project/sqlr v0.9.2-0.20261022101442-f23fc53d1d89 h1:MvD1qWwt0KkPdXrI0yx5quWGEtt89wpRAGOvMPSUVrA=
