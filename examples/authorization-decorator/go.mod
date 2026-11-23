@@ -8,7 +8,7 @@ require (
 	github.com/gosoline-project/httpserver v0.6.5
 	github.com/gosoline-project/sqlh v0.9.0
 	github.com/gosoline-project/sqlr v0.10.0
-	github.com/justtrackio/gosoline v0.69.0
+	github.com/justtrackio/gosoline v0.69.4
 )
 
 require (
