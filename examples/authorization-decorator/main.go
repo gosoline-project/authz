@@ -137,15 +137,9 @@ func (demoEvaluator) CheckBulk(ctx context.Context, subject authz.Subject, check
 
 func logAuthorizationObservation(ctx context.Context, observation authz.Observation) {
 	for index, check := range observation.Checks {
-		decision := "unknown"
+		decision := authz.Result("unknown")
 		if index < len(observation.Decisions) {
-			if observation.Decisions[index].Err != nil {
-				decision = "error"
-			} else if observation.Decisions[index].Allowed {
-				decision = "allow"
-			} else {
-				decision = "deny"
-			}
+			decision = observation.Decisions[index].Result()
 		}
 
 		log.Printf(
@@ -156,7 +150,7 @@ func logAuthorizationObservation(ctx context.Context, observation authz.Observat
 			check.Resource.Type,
 			check.Resource.ID,
 			check.Permission,
-			decision,
+			string(decision),
 			observation.Err,
 		)
 	}
