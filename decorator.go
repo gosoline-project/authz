@@ -378,6 +378,22 @@ func NewAuthorization(evaluator Evaluator, options ...Option) (*Authorization, e
 		options:   resolved,
 	}, nil
 }
+// ValidateEnforcingPolicy checks that an authorizer and policy can protect an
+// operation. Unlike Decorate, it rejects Shadow mode and policies without any
+// checks; it does not change the behavior of existing decorated operations.
+func ValidateEnforcingPolicy[I, O any](authorizer *Authorization, policy Policy[I, O]) error {
+	if authorizer == nil || authorizer.evaluator == nil {
+		return errors.New("authorization authorizer is required")
+	}
+	if authorizer.options.mode != Enforce && authorizer.options.mode != Filter {
+		return errors.New("authorization requires Enforce or Filter mode")
+	}
+	if policy.Before == nil && policy.After == nil {
+		return errors.New("authorization policy requires a before or after check")
+	}
+
+	return nil
+}
 
 // Decorate applies a configured authorizer to a typed policy and operation.
 // The generic input/output types are inferred independently for every call,
