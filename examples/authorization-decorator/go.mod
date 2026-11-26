@@ -5,10 +5,10 @@ go 1.27.0
 require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/gosoline-project/authz v0.0.0
-	github.com/gosoline-project/httpserver v0.6.5
-	github.com/gosoline-project/sqlh v0.9.0
-	github.com/gosoline-project/sqlr v0.10.0
-	github.com/justtrackio/gosoline v0.69.0
+	github.com/gosoline-project/httpserver v0.6.9-0.20261126111541-f0cbce27a933
+	github.com/gosoline-project/sqlh v0.9.2-0.20261126111823-458aadcac7c3
+	github.com/gosoline-project/sqlr v0.10.1-0.20261126111713-cfb9936280de
+	github.com/justtrackio/gosoline v0.69.6-0.20261126111349-167371af9677
 )
 
 require (
@@ -95,7 +95,7 @@ require (
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gosoline-project/sqlc v0.5.0 // indirect
+	github.com/gosoline-project/sqlc v0.5.1-0.20261126111541-d13d4ec2626e // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/hamba/avro/v2 v2.29.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
